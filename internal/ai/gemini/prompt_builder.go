@@ -23,5 +23,22 @@ func BuildAnalyzeFilesForCommentsPrompt(files []scanner.FileInfo) string {
 		log.Fatal(err)
 	}
 
-	return fmt.Sprintf(prompt.AnalyzeFilesForCommentsResponse, encoded)
+	return fmt.Sprintf(prompt.AnalyzeFilesForComments, encoded)
+}
+
+func BuildGenerateCommentsForFilesPrompt(files []FileContent) string {
+	data := map[string]interface{}{
+		"files": files,
+	}
+
+	encoded, err := gotoon.Encode(
+		data,
+		gotoon.WithIndent(0),       // no extra spaces
+		gotoon.WithDelimiter("\t"), // tabs tokenize better
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	return fmt.Sprintf(prompt.GenerateCommentsForFiles, encoded)
 }
