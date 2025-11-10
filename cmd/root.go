@@ -10,9 +10,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
-
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
+// Defines the primary command and its metadata like usage, short description, and long description.
 var rootCmd = &cobra.Command{
 	Use:   "AutoCommenter",
 	Short: "A brief description of your application",
@@ -47,5 +46,3 @@ func init() {
 	// when this action is called directly.
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
-
-

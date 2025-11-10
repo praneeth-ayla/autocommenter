@@ -1,5 +1,7 @@
 package prompt
 
+// AnalyzeFilesForComments is a string constant defining the prompt for the AI model
+// to identify files that require comments or documentation updates.
 var AnalyzeFilesForComments = `
 You are a project analyzer.
 

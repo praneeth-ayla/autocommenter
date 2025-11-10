@@ -7,6 +7,7 @@ import (
 	"google.golang.org/genai"
 )
 
+// NewClient creates and returns a new Gemini AI client.
 func NewClient(ctx context.Context) *genai.Client {
 	client, err := genai.NewClient(ctx, nil)
 	if err != nil {

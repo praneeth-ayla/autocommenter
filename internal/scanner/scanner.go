@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 )
 
+// skipDirs defines a map of directory names to be ignored during scanning.
 var skipDirs = map[string]bool{
 	"node_modules": true,
 	".git":         true,
@@ -17,11 +18,13 @@ var skipDirs = map[string]bool{
 	"build":        true,
 }
 
+// skipFilePatterns defines a list of file name patterns to be ignored during scanning.
 var skipFilePatterns = []string{
 	".env",
 	".env.*",
 }
 
+// Scanner walks the specified path, collects file information, and skips unwanted directories and files.
 func Scanner(path string) ([]FileInfo, error) {
 	files := []FileInfo{}
 	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
@@ -30,20 +33,24 @@ func Scanner(path string) ([]FileInfo, error) {
 			return nil
 		}
 
-		// Skip unwanted directories
+		// Skip unwanted directories if identified.
 		if d.IsDir() && skipDirs[d.Name()] {
 			return fs.SkipDir
 		}
 
+		// Process files (not directories).
 		if !d.IsDir() {
 			base := filepath.Base(path)
+			// Skip files matching defined patterns.
 			if shouldSkipFile(base) {
 				return nil
 			}
 
+			// Get file info and count lines.
 			info, _ := d.Info()
 			lines := countLines(path)
 
+			// Create FileInfo struct and append to results.
 			file := FileInfo{
 				Path:  path,
 				Name:  base,
@@ -64,6 +71,7 @@ func Scanner(path string) ([]FileInfo, error) {
 	return files, nil
 }
 
+// shouldSkipFile checks if a file name matches any of the skip patterns.
 func shouldSkipFile(name string) bool {
 	for _, pattern := range skipFilePatterns {
 		match, _ := filepath.Match(pattern, name)
@@ -75,6 +83,7 @@ func shouldSkipFile(name string) bool {
 	return false
 }
 
+// countLines counts the number of lines in a given file.
 func countLines(path string) int {
 	file, err := os.Open(path)
 	if err != nil {
