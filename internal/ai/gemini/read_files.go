@@ -12,10 +12,10 @@ type FileContent struct {
 }
 
 // ReadFileContent reads the content for a list of file paths.
-func ReadFileContent(files FileResponse) []FileContent {
+func ReadFileContent(files []string) []FileContent {
 	var fileContents []FileContent
 
-	for _, filePath := range files.Files {
+	for _, filePath := range files {
 
 		// Read the entire content of the file.
 		content, err := os.ReadFile(filePath)

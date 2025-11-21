@@ -1,104 +1,109 @@
 package scanner
 
 import (
-	"bytes"
-	"errors"
 	"fmt"
 	"io/fs"
-	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 )
 
-// skipDirs defines a map of directory names to be ignored during scanning.
 var skipDirs = map[string]bool{
 	"node_modules": true,
 	".git":         true,
-	"venv":         true,
 	".next":        true,
 	"build":        true,
+	"dist":         true,
+	"migrations":   true,
+	"prisma":       true,
 }
 
-// skipFilePatterns defines a list of file name patterns to be ignored during scanning.
-var skipFilePatterns = []string{
-	".env",
-	".env.*",
+var allowedExt = map[string]bool{
+	".ts":  true,
+	".tsx": true,
+	".js":  true,
+	".jsx": true,
+	".go":  true,
+	".py":  true,
 }
 
-// Scanner walks the specified path, collects file information, and skips unwanted directories and files.
-func Scanner(path string) ([]FileInfo, error) {
-	files := []FileInfo{}
-	err := filepath.WalkDir(path, func(path string, d fs.DirEntry, err error) error {
+func Scanner(root string) ([]string, error) {
+	abs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, err
+	}
+
+	var files []string
+	err = filepath.WalkDir(abs, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			fmt.Println("Error:", err)
+			fmt.Println("Walk error:", err)
 			return nil
 		}
 
-		// Skip unwanted directories if identified.
-		if d.IsDir() && skipDirs[d.Name()] {
-			return fs.SkipDir
+		// Skip directories by name
+		if d.IsDir() {
+			rel, _ := filepath.Rel(abs, path)
+			for skip := range skipDirs {
+				if strings.HasPrefix(rel, skip+"/") {
+					return filepath.SkipDir
+				}
+			}
 		}
 
-		// Process files (not directories).
+		// Accept only files
 		if !d.IsDir() {
-			base := filepath.Base(path)
-			// Skip files matching defined patterns.
-			if shouldSkipFile(base) {
+			ext := filepath.Ext(path)
+			// Skip files with non-allowed extensions
+			if !allowedExt[ext] {
 				return nil
 			}
 
-			// Get file info and count lines.
-			info, _ := d.Info()
-			lines := countLines(path)
-
-			// Create FileInfo struct and append to results.
-			file := FileInfo{
-				Path:  path,
-				Name:  base,
-				Size:  info.Size(),
-				Lines: lines,
+			// Convert to clean relative path
+			rel, err := filepath.Rel(abs, path)
+			if err == nil {
+				files = append(files, rel)
 			}
-
-			files = append(files, file)
 		}
-
 		return nil
 	})
 
 	if err != nil {
-		return files, errors.New("something went wrong")
+		return nil, err
 	}
 
+	// Sort for consistent output every run
+	sort.Strings(files)
 	return files, nil
 }
 
-// shouldSkipFile checks if a file name matches any of the skip patterns.
-func shouldSkipFile(name string) bool {
-	for _, pattern := range skipFilePatterns {
-		match, _ := filepath.Match(pattern, name)
+// FilterFilesNeedingComments removes files that typically don't need comments
+func FilterFilesNeedingComments(files []string) []string {
+	var result []string
 
-		if match {
-			return true
+	for _, file := range files {
+		// Skip type definition files
+		if strings.HasSuffix(file, ".d.ts") {
+			continue
 		}
-	}
-	return false
-}
 
-// countLines counts the number of lines in a given file.
-func countLines(path string) int {
-	file, err := os.Open(path)
-	if err != nil {
-		return 0
-	}
-	defer file.Close()
-
-	buf := make([]byte, 32*1024)
-	count := 0
-	for {
-		c, err := file.Read(buf)
-		count += bytes.Count(buf[:c], []byte{'\n'})
-		if err != nil {
-			break
+		// Skip specific directories that don't need comments
+		if strings.Contains(file, "/ui/") || // shadcn/ui components
+			strings.Contains(file, "/types/") || // type definition files
+			strings.Contains(file, "/__tests__/") || // test files
+			strings.Contains(file, "/.storybook/") { // storybook config
+			continue
 		}
+
+		// Skip specific config/generated files
+		if strings.HasPrefix(file, "next-env.d.ts") ||
+			strings.HasPrefix(file, "next.config") ||
+			strings.Contains(file, "seed.") { // seed files are usually simple
+			continue
+		}
+
+		// Include everything else
+		result = append(result, file)
 	}
-	return count
+
+	return result
 }
