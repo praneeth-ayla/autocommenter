@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/praneeth-ayla/AutoCommenter/internal/ai"
+	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
 	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
 	"github.com/spf13/cobra"
 )
@@ -39,7 +40,7 @@ var scanCmd = &cobra.Command{
 		fmt.Println("Batches created:", len(batches))
 
 		t := ai.NewProvider("gemini")
-
+		fullContext := map[string]contextstore.FileDetails{}
 		for i, b := range batches {
 			fmt.Println()
 			fmt.Println("Starting batch", i+1, "with", len(b), "files")
@@ -48,23 +49,30 @@ var scanCmd = &cobra.Command{
 
 			fmt.Println("Loaded content for batch", i+1)
 
-			comments, err := t.GenerateContextBatch(data)
+			contexts, err := t.GenerateContextBatch(data)
 			if err != nil {
-				fmt.Println("Error generating comments for batch", i+1, err)
+				fmt.Println("Error generating contexts for batch", i+1, err)
 				continue
 			}
 
 			fmt.Println("Completed batch", i+1)
 			fmt.Println("------------------------------------------------")
 
-			for _, c := range comments {
+			for _, c := range contexts {
 				fmt.Println("File:", c.Path)
 				fmt.Println("Exports:", c.Exports)
 				fmt.Println("Imp Logic:", c.ImpLogic)
 				fmt.Println("Name:", c.Name)
 				fmt.Println("Summary:", c.Summary)
 				fmt.Println("------------------------------------------------")
+
+				fullContext[c.Path] = c
 			}
+		}
+
+		err = contextstore.Save(fullContext)
+		if err != nil {
+			return fmt.Errorf("unable to save context: %v", err)
 		}
 
 		fmt.Println()
