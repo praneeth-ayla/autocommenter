@@ -64,15 +64,12 @@ func Scan(root string) ([]Info, error) {
 
 		lines := countLines(path)
 
-		rel, relErr := filepath.Rel(abs, path)
-		if relErr == nil {
-			files = append(files, Info{
-				Path:  rel,
-				Name:  info.Name(),
-				Size:  info.Size(),
-				Lines: lines,
-			})
-		}
+		files = append(files, Info{
+			Path:  filepath.Clean(path),
+			Name:  info.Name(),
+			Size:  info.Size(),
+			Lines: lines,
+		})
 
 		return nil
 	})
