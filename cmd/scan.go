@@ -1,10 +1,8 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/praneeth-ayla/AutoCommenter/internal/ai"
 	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
@@ -12,79 +10,81 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// scanCmd represents the scan command, used to scan files and generate comments.
 var scanCmd = &cobra.Command{
 	Use:   "scan",
-	Short: "Scan and list files needing comments",
+	Short: "Scan project, generate context and apply comments",
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		fmt.Println("Scanning project files...")
+		fmt.Println("Scanning project files")
 
 		files, err := scanner.Scan(".")
 		if err != nil {
 			return fmt.Errorf("scan failed: %w", err)
 		}
 
-		fmt.Println("Total files scanned:", len(files))
-
-		filtered := scanner.FilterFilesNeedingComments(files)
-
-		fmt.Println("Files considered for commenting:", len(filtered))
-
-		if len(filtered) == 0 {
-			fmt.Println("No files found that need comments")
+		candidates := scanner.FilterFilesNeedingComments(files)
+		if len(candidates) == 0 {
+			fmt.Println("No files need comments")
 			return nil
 		}
 
-		batches := BatchByLines(filtered, 1000)
-		fmt.Println("Batches created:", len(batches))
+		provider := ai.NewProvider("gemini")
+		allContext := make(map[string]contextstore.FileDetails)
 
-		t := ai.NewProvider("gemini")
-		fullContext := map[string]contextstore.FileDetails{}
-		for i, b := range batches {
-			fmt.Println()
-			fmt.Println("Starting batch", i+1, "with", len(b), "files")
+		batches := BatchByLines(candidates, 500)
 
-			data := scanner.Load(b)
+		for _, batch := range batches {
+			batchData := scanner.Load(batch)
 
-			fmt.Println("Loaded content for batch", i+1)
-
-			contexts, err := t.GenerateContextBatch(data)
+			ctx, err := provider.GenerateContextBatch(batchData)
 			if err != nil {
-				fmt.Println("Error generating contexts for batch", i+1, err)
+				fmt.Println("context batch error", err)
 				continue
 			}
 
-			fmt.Println("Completed batch", i+1)
-			fmt.Println("------------------------------------------------")
-
-			for _, c := range contexts {
-				fmt.Println("File:", c.Path)
-				fmt.Println("Exports:", c.Exports)
-				fmt.Println("Imports:", c.Imports)
-				fmt.Println("Name:", c.Name)
-				fmt.Println("Summary:", c.Summary)
-				fmt.Println("------------------------------------------------")
-
-				fullContext[c.Path] = c
+			for _, item := range ctx {
+				allContext[item.Path] = item
 			}
 		}
 
-		err = contextstore.Save(fullContext)
-		if err != nil {
-			return fmt.Errorf("unable to save context: %v", err)
+		if err := contextstore.Save(allContext); err != nil {
+			return fmt.Errorf("context save failed: %w", err)
 		}
 
-		fmt.Println()
-		fmt.Println("Scan completed successfully")
+		fmt.Println("context generation completed")
+
+		allCtxSlice := mapToSlice(allContext)
+
+		for _, file := range candidates {
+			fd := scanner.LoadSingle(file)
+			commented, err := provider.GenerateComments(fd.Content, allCtxSlice)
+			if err != nil {
+				fmt.Println("comment generation error for", file.Path, err)
+				continue
+			}
+
+			if err := os.WriteFile(file.Path, []byte(commented), 0644); err != nil {
+				fmt.Println("file update failed for", file.Path, err)
+				continue
+			}
+
+			fmt.Println("Updated", file.Path)
+		}
 
 		return nil
 	},
 }
 
 func init() {
-	// Add the scan command as a subcommand to the root command.
 	rootCmd.AddCommand(scanCmd)
+}
+
+func mapToSlice(m map[string]contextstore.FileDetails) []contextstore.FileDetails {
+	out := make([]contextstore.FileDetails, 0, len(m))
+	for _, v := range m {
+		out = append(out, v)
+	}
+	return out
 }
 
 func BatchByLines(files []scanner.Info, maxLines int) [][]scanner.Info {
@@ -93,9 +93,9 @@ func BatchByLines(files []scanner.Info, maxLines int) [][]scanner.Info {
 	used := 0
 
 	for _, f := range files {
-		if used+f.Lines > maxLines {
+		if used+f.Lines > maxLines && len(group) > 0 {
 			result = append(result, group)
-			group = []scanner.Info{}
+			group = nil
 			used = 0
 		}
 		group = append(group, f)

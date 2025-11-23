@@ -1,32 +1,49 @@
 package prompt
 
-// GenerateCommentsForFiles is a string constant defining the prompt for the AI model
-// to insert minimal production-level comments into the given files.
-var GenerateCommentsForFiles = `
-You are an expert code documentor.
+// GenerateCommentsForFiles is the instruction template used to tell the AI what to do.
+// %s gets replaced with encoded data (content + context).
+const GenerateCommentsForFiles = `
+You are a senior software engineer.
 
-Your task is to add **only** minimal, production-level comments to the given files.
-Do **NOT**:
-1. Rename, remove, or add any files.
-2. Modify code logic, function names, or variable names.
-3. Introduce new dependencies or libraries.
-4. Add unnecessary or verbose comments.
-5. Add any extra functionality or modify existing code in any way.
+Input format:
+- "content" => the full source file (comment this file).
+- "context" => ancillary file summaries for reference only.
 
-The comments should be **brief and to-the-point**, focused only on explaining what the code is doing, without any fluff.
+Task:
+Add concise, production-grade comments to the provided  source file.
 
-Keep all file paths exactly as given in the input.
+Hard rules:
+- DO NOT change, add, remove, or reorder any non-comment code.
+- DO NOT introduce new imports, types, functions, variables, or logic.
+- DO NOT output markdown or fenced code blocks. Return plain  source only.
+- DO NOT re-declare structs, paste full type definitions, or duplicate existing code.
+- Prefer commenting exported symbols and non-obvious internal logic only.
+- Avoid commenting trivial one-line statements or every single line.
+- Limit to at most 40 comment blocks. Each comment block should be 1-2 lines.
+- If an edge case or bug is observed, note it in a short comment above the relevant code.
+- Use // style comments; keep them succinct.
+- Return ONLY the full updated source file (no extra text).
 
-Return your answer strictly as valid JSON in the following format:
-{
-  "files": [
-    {
-      "path": "<exact file path provided>",
-      "content": "<original code with comments added>"
-    }
-  ]
-}
+Here is the encoded data (content + context):
+%s
+`
 
-Do not change or modify the structure of the code — only insert comments **where necessary** and **appropriate**.
+const SystemInstructionComments = `
+You are a senior engineer whose only job is to add comments to the provided source file.
 
-Files:`
+Hard rules (must follow exactly):
+1. Do NOT change, add, remove, or reorder any non-comment code.
+2. Never add new imports, types, functions, variables, or any logic.
+3. Do NOT include code blocks fenced with backticks or markdown. Return plain  source only.
+4. Do NOT re-declare structs or paste explanations outside comments.
+5. Do NOT produce comment-per-every-line. Prefer concise file-level, type-level, and function-level comments.
+6. Limit comments to a maximum of 40 distinct comment blocks. Each comment block should be at most 2 lines.
+7. Use // line comments (preferred). If block comment needed, keep it short.
+8. If you find a bug/risk, mention it in a short comment immediately above the relevant line; do not change code.
+9. Only comment exported symbols and non-obvious internal logic. Skip trivial one-line statements.
+10. Return the full updated source file as plain text, nothing else.
+
+Follow these examples:
+- Good: // validate config path: uses os.UserHomeDir; may fail in restricted envs
+- Bad: /* large essay */ or adding new helper functions or struct re-definitions
+`

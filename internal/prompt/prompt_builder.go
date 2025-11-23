@@ -8,17 +8,16 @@ import (
 	"github.com/alpkeskin/gotoon"
 )
 
-// BuildGenerateCommentsForFilesPrompt constructs the AI prompt to generate comments for given files.
-func BuildGenerateCommentsForFilesPrompt(files []string) string {
+func BuildGenerateCommentsForFilesPrompt(content string, contextData string) string {
 	data := map[string]interface{}{
-		"files": files,
+		"content": content,
+		"context": contextData,
 	}
 
-	// Encode the file content into a structured string format for the AI prompt.
 	encoded, err := gotoon.Encode(
 		data,
-		gotoon.WithIndent(0),       // no extra spaces
-		gotoon.WithDelimiter("\t"), // tabs tokenize better
+		gotoon.WithIndent(0),
+		gotoon.WithDelimiter("\t"),
 	)
 	if err != nil {
 		log.Fatal(err)
