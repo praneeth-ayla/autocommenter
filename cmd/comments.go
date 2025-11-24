@@ -28,8 +28,13 @@ const (
 
 var commentsCmd = &cobra.Command{
 	Use:   "comments",
-	Short: "Manage code comments",
-	Long:  `Commands for generating and managing code comments in your project.`,
+	Short: "Generate and manage code comments",
+	Long: `Commands that help you scan the project and add missing comments
+by using AI to document your code automatically.
+
+Example:
+  AutoCommenter comments gen
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Use 'comments gen' to generate comments for your files")
 		err := HitRateLimit()
@@ -43,9 +48,15 @@ var commentsCmd = &cobra.Command{
 
 var genCommentsCmd = &cobra.Command{
 	Use:   "gen",
-	Short: "Generate comments for code files",
-	Long:  `Scans your project, identifies files needing comments, and uses AI to generate appropriate documentation.`,
-	RunE:  runGenerateComments,
+	Short: "Add comments to code files that need them",
+	Long: `Scan the project and find files without proper comments.
+Use AI to generate comments and write them back into the files.
+Retries automatically if API rate limits occur.
+
+Example:
+  AutoCommenter comments gen
+`,
+	RunE: runGenerateComments,
 }
 
 func init() {

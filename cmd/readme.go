@@ -17,26 +17,32 @@ import (
 // readmeCmd represents the readme command
 var readmeCmd = &cobra.Command{
 	Use:   "readme",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
+	Short: "Manage project README file",
+	Long: `Generate or update README.md based on the scanned project context
+and any existing README found in the project.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+Example:
+  AutoCommenter readme gen
+`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("readme called")
+		fmt.Println("Use 'readme gen' to generate readme.md for your project")
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(readmeCmd)
-	readmeCmd.AddCommand(genReadmeCmd)
 }
 
 var genReadmeCmd = &cobra.Command{
 	Use:   "gen",
-	Short: "Generate README.md for the project",
+	Short: "Generate or update README.md",
+	Long: `Create or replace the README.md file in the project root.
+This uses collected project context and AI generation.
+
+Actions:
+  1. Load stored project context
+  2. Merge with existing README if available
+  3. Write a new README.md
+
+Example:
+  AutoCommenter readme gen
+`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
 		rootPath := scanner.GetProjectRoot()
@@ -79,4 +85,9 @@ var genReadmeCmd = &cobra.Command{
 		fmt.Println(";) README.md updated:", outputPath)
 		return nil
 	},
+}
+
+func init() {
+	rootCmd.AddCommand(readmeCmd)
+	readmeCmd.AddCommand(genReadmeCmd)
 }

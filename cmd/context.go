@@ -16,34 +16,27 @@ import (
 // contextCmd represents the context command
 var contextCmd = &cobra.Command{
 	Use:   "context",
-	Short: "Work with code context",
-	Long: `This command helps you manage context data for your project.
-Context helps AutoCommenter understand your code better.
+	Short: "Manage project context",
+	Long: `Work with the stored context that helps generate accurate comments and readme doc.
+Use this command to scan the project and collect useful information.
 
-To generate context run:
-
+Example:
   AutoCommenter context gen
-
-This will scan your project and build a context database.`,
+`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Run 'AutoCommenter context gen' to generate context")
 	},
 }
 
-func init() {
-	rootCmd.AddCommand(contextCmd)
-	contextCmd.AddCommand(contextGenCmd)
-}
-
 var contextGenCmd = &cobra.Command{
 	Use:   "gen",
-	Short: "Generate context for your project",
-	Long: `Scan your project and build context info for all supported files.
+	Short: "Scan project and build context",
+	Long: `Scan supported files in the project and store context data.
+This improves the quality of generated comments and readme later.
 
-Usage example:
+Example:
   AutoCommenter context gen
-
-After generation you can run comment commands that use this context.`,
+`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println("Generating Context")
 
@@ -100,4 +93,9 @@ After generation you can run comment commands that use this context.`,
 		fmt.Println("context generation completed")
 		return nil
 	},
+}
+
+func init() {
+	rootCmd.AddCommand(contextCmd)
+	contextCmd.AddCommand(contextGenCmd)
 }
