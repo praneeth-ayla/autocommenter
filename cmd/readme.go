@@ -78,7 +78,8 @@ Example:
 
 		outputPath := filepath.Join(rootPath, "README.md")
 
-		if err := os.WriteFile(outputPath, []byte(newReadme), 0644); err != nil {
+		err = scanner.WriteFile(outputPath, newReadme)
+		if err != nil {
 			return fmt.Errorf("failed to write README.md: %w", err)
 		}
 

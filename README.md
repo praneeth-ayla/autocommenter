@@ -1,134 +1,111 @@
+# AutoCommenter 🧠
 
+[![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-# 🧠 AutoCommenter – AI-Powered Code Comment & Documentation Generator
-
-### Overview
-
-**AutoCommenter** is a command-line tool built in **Go** that automatically adds production-level comments and generates detailed documentation for any codebase.
-It integrates with **Git** to identify updated files, analyzes their logic using an **AI model (GPT or local LLM)**, and inserts meaningful comments to improve code readability and maintainability.
-
-The tool also supports automatic **Markdown documentation generation**, helping teams quickly create technical docs based on the actual code context.
+**AutoCommenter** is a command-line tool that leverages AI to automate the tedious process of writing code comments and project documentation. It scans your codebase, builds a contextual understanding using Google's Gemini model, and then uses that context to generate high-quality, meaningful comments and a comprehensive `README.md` file.
 
 ---
 
-### 🚀 Features
+## ✨ Features
 
-* **Automated Commenting**
-  Scans the project and intelligently inserts detailed, context-aware comments in source files.
-
-* **Smart Git Integration**
-  Detects changed or updated files using `git status` and limits operations to only those files.
-
-* **Documentation Generator**
-  Creates clean, structured Markdown docs summarizing each function, class, and file.
-
-* **Interactive Mode**
-  If the model lacks context, it can request clarification or open specific files for user input.
-
-* **License Assistant**
-  Helps users choose a suitable open-source license and explains each option in simple terms.
-
-* **Configurable Models**
-  Works with GPT API or local LLMs (like Code LLaMA or GPT4All) for offline use.
+*   **AI-Powered Context Generation**: Scans your entire project to understand the purpose of each file, its exports, and its relationship with other modules.
+*   **Automated Code Commenting**: Intelligently inserts detailed, context-aware comments directly into your source files.
+*   **README.md Generation**: Automatically creates a well-structured `README.md` for your project based on the overall code context.
+*   **Two-Step Process**: Ensures high-quality output by first building a project-wide context before generating comments or documentation.
+*   **Modular AI Backend**: Built with a provider interface to easily support different AI models in the future (currently implemented with Google Gemini).
 
 ---
 
-### 🧩 Tech Stack
+## ⚙️ How It Works
 
-* **Language:** Go
-* **Libraries:** Cobra (CLI), os/exec, io/fs
-* **AI Integration:** OpenAI API / Local LLM (via Ollama or llama.cpp)
-* **Version Control:** Git
-* **Documentation Output:** Markdown
+The tool operates in a two-step process to ensure high-quality, context-aware output:
 
----
+1.  **Generate Context**: First, `AutoCommenter` scans your project to understand the purpose of each file. This information is summarized by the AI and stored locally in a `.autocommenter/context.json` file. This step builds a holistic understanding of your entire codebase.
 
-### ⚙️ How It Works
-
-1. **Scan Repository**
-   Walks through the project structure and identifies code files.
-
-2. **Find Updated Files**
-   Uses `git status --porcelain` to detect files modified since last commit.
-
-3. **Generate Comments**
-   Sends file content to the AI model for understanding and comment generation.
-
-4. **Write Back**
-   Inserts structured comments directly into code or outputs them to a preview file.
-
-5. **Generate Documentation (Optional)**
-   Creates Markdown summaries of key functions and logic flow across files.
+2.  **Generate Artifacts**: With the project context established, you can generate code comments or a README. This approach ensures that the generated content is not just based on a single file, but on the project as a whole, leading to more accurate and relevant results.
 
 ---
 
-### 🧰 Example Commands
+## 🚀 Getting Started
 
-```bash
-# Add comments to all updated files
-go run main.go --action=comment
+### Prerequisites
 
-# Generate documentation for the entire project
-go run main.go --action=docs
+*   Go 1.21 or later.
+*   A Google Gemini API key.
 
-# Use a specific model (e.g., local Code LLaMA)
-go run main.go --action=comment --model=local
-```
+### 1. Installation
 
----
+You can install `AutoCommenter` directly using `go install`:
 
-### 🧠 Example Workflow
+go install github.com/praneeth-ayla/AutoCommenter/cmd/autocommenter@latest
 
-```bash
-> git status
-M main.go
-M routes/handlers.go
+### 2. Configuration
 
-> go run main.go --action=comment
-✅ Added detailed comments to 2 files
+Export your Google Gemini API key as an environment variable:
 
-> go run main.go --action=docs
-📄 Generated documentation at /docs/project_summary.md
-```
+export GEMINI_API_KEY="YOUR_API_KEY_HERE"
 
 ---
 
-### 🧱 Project Structure
+## 🧰 Usage
 
-```
+All commands should be run from the root directory of your project.
+
+### Step 1: Generate Project Context
+
+This is the first and most important step. It creates the knowledge base the tool uses for all other operations.
+
+autocommenter context gen
+
+This command will:
+*   Recursively scan your source files.
+*   Call the Gemini API to generate a summary for each file.
+*   Save this context to a `.autocommenter/context.json` file in your project root.
+
+### Step 2 (Option A): Generate Code Comments
+
+Once the context is generated, you can add comments to your files. The tool will identify which files need comments and generate them.
+
+autocommenter comments gen
+
+### Step 2 (Option B): Generate a README File
+
+To generate a new `README.md` for your project based on the code context:
+
+autocommenter readme gen
+
+If a `README.md` file already exists, the tool will attempt to merge the AI-generated content with your existing file.
+
+---
+
+## 🧱 Project Structure
+
+A brief overview of the `AutoCommenter` internal structure:
+
 AutoCommenter/
-│
-├── main.go              # Entry point for CLI
-├── cmd/                 # CLI command definitions
+├── cmd/                  # Cobra CLI command definitions (root, context, comments, readme)
 ├── internal/
-│   ├── gitutils/        # Functions for Git integration
-│   ├── fileparser/      # Reads and parses code files
-│   ├── ai/              # LLM interaction logic
-│   ├── docgen/          # Markdown documentation generator
-│   └── utils/           # Helper utilities
-├── go.mod
-└── README.md
-```
+│   ├── ai/               # AI provider interface and Gemini implementation
+│   ├── contextstore/     # Logic for saving and loading project context from JSON
+│   ├── prompt/           # Builders for constructing prompts sent to the AI
+│   └── scanner/          # File system scanning, batching, and I/O utilities
+├── main.go               # Main application entry point
+└── go.mod
 
 ---
 
-### 🌐 Future Enhancements
+## 🌐 Future Enhancements
 
-* Fine-tune LLMs for commenting style per language.
-* Add project-level context caching for faster commenting.
-* Enable real-time chat mode for code explanation & editing.
-* VSCode extension for inline AI comments.
+*   Support for more programming languages.
+*   Integration with other AI providers (e.g., OpenAI, Anthropic).
+*   Fine-grained control over commenting style and verbosity.
+*   A VS Code extension for a more integrated workflow.
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
 
 ---
 
-### 📜 License
+## 📜 License
 
-AutoCommenter supports multiple open-source licenses.
-You can generate or change the license interactively:
-
-```bash
-go run main.go --action=license
-```
-
-If you’re unsure which license fits your project, the AI can explain each option in simple terms.
-
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

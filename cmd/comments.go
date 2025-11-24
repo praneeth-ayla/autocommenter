@@ -1,11 +1,9 @@
-/* Copyright © 2025 NAME HERE <EMAIL ADDRESS> */
 package cmd
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -60,18 +58,18 @@ Example:
 }
 
 func init() {
+	genCommentsCmd.SilenceUsage = true
+	genCommentsCmd.SilenceErrors = true
+
 	rootCmd.AddCommand(commentsCmd)
 	commentsCmd.AddCommand(genCommentsCmd)
 }
 
-// runGenerateComments is the main entry point for comment generation
 func runGenerateComments(cmd *cobra.Command, args []string) error {
-	// Initialize
 	rootPath := scanner.GetProjectRoot()
 	provider := ai.NewProvider("gemini")
 
-	// Scan project
-	fmt.Println("📁 Scanning project files...")
+	fmt.Println("Scanning project files...")
 	files, err := scanner.Scan(rootPath)
 	if err != nil {
 		return fmt.Errorf("failed to scan files: %w", err)
@@ -79,39 +77,36 @@ func runGenerateComments(cmd *cobra.Command, args []string) error {
 
 	filteredFiles := scanner.FilterFilesNeedingComments(files)
 	if len(filteredFiles) == 0 {
-		fmt.Println("✅ No files need comments!")
+		fmt.Println("No files need comments")
 		return nil
 	}
 
-	fmt.Printf("📝 Found %d files needing comments\n", len(filteredFiles))
+	fmt.Printf("Found %d files needing comments\n", len(filteredFiles))
 
-	// Load context
-	fmt.Println("🔍 Loading project context...")
+	fmt.Println("Loading project context...")
 	context, err := contextstore.Load()
 	if err != nil {
 		return fmt.Errorf("failed to load context: %w", err)
 	}
 	allCtxSlice := contextstore.MapToSlice(context)
 
-	// Process files
-	fmt.Println("🤖 Generating comments...")
+	fmt.Println("Generating comments...")
 	successCount, errorCount := 0, 0
 
 	for i, file := range filteredFiles {
 		fmt.Printf("\n[%d/%d] Processing: %s\n", i+1, len(filteredFiles), file.Path)
 
 		if err := processFile(file, provider, allCtxSlice); err != nil {
-			fmt.Printf("❌ Error: %v\n", err)
+			fmt.Printf("Error: %v\n", err)
 			errorCount++
 		} else {
-			fmt.Printf("✅ Updated successfully\n")
+			fmt.Println("Updated successfully")
 			successCount++
 		}
 	}
 
-	// Summary
 	fmt.Println("\n" + strings.Repeat("─", 50) + "\n")
-	fmt.Printf("📊 Summary: %d succeeded, %d failed\n", successCount, errorCount)
+	fmt.Printf("Summary: %d succeeded, %d failed\n", successCount, errorCount)
 
 	if errorCount > 0 {
 		return fmt.Errorf("completed with %d errors", errorCount)
@@ -120,7 +115,6 @@ func runGenerateComments(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// processFile handles comment generation for a single file with automatic retries
 func processFile(file scanner.Info, provider ai.Provider, context []contextstore.FileDetails) error {
 	fd := scanner.LoadSingle(file)
 	var lastErr error
@@ -128,16 +122,14 @@ func processFile(file scanner.Info, provider ai.Provider, context []contextstore
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
 		commented, err := provider.GenerateComments(fd.Content, context)
 		if err == nil {
-			// Success - write file
-			return os.WriteFile(file.Path, []byte(commented), 0644)
+			return scanner.WriteFile(file.Path, commented)
 		}
 
 		lastErr = err
 
-		// Check if this is a retryable rate limit error
 		if retryDelay, isRateLimit := checkRateLimitError(err); isRateLimit {
 			if attempt < maxRetryAttempts {
-				fmt.Printf("⏳ Rate limit hit. Waiting %v before retry %d/%d...\n",
+				fmt.Printf("Rate limit hit. Waiting %v before retry %d/%d...\n",
 					retryDelay, attempt+1, maxRetryAttempts)
 				time.Sleep(retryDelay)
 				continue
@@ -145,16 +137,13 @@ func processFile(file scanner.Info, provider ai.Provider, context []contextstore
 			return fmt.Errorf("rate limit exceeded after %d attempts", maxRetryAttempts)
 		}
 
-		// Non-retryable error
 		return fmt.Errorf("generation failed: %w", err)
 	}
 
 	return fmt.Errorf("max retries exceeded: %w", lastErr)
 }
 
-// checkRateLimitError determines if an error is a rate limit error and extracts retry delay
-func checkRateLimitError(err error) (retryDelay time.Duration, isRateLimit bool) {
-	// Check error string for rate limit indicators
+func checkRateLimitError(err error) (time.Duration, bool) {
 	errStr := err.Error()
 	if strings.Contains(errStr, "RESOURCE_EXHAUSTED") ||
 		strings.Contains(errStr, "429") ||
@@ -162,11 +151,9 @@ func checkRateLimitError(err error) (retryDelay time.Duration, isRateLimit bool)
 		return extractRetryDelay(errStr), true
 	}
 
-	// Check structured API error
 	var apiErr *apierror.APIError
 	if errors.As(err, &apiErr) {
 		if status := apiErr.GRPCStatus(); status != nil && status.Code() == codes.ResourceExhausted {
-			// Try to extract RetryInfo from status details
 			for _, detail := range status.Details() {
 				if retryInfo, ok := detail.(*errdetails.RetryInfo); ok {
 					if retryInfo.RetryDelay != nil {
@@ -176,7 +163,6 @@ func checkRateLimitError(err error) (retryDelay time.Duration, isRateLimit bool)
 					}
 				}
 			}
-			// Rate limit confirmed but no retry info - use default
 			return defaultRetryDelay, true
 		}
 	}
@@ -184,9 +170,7 @@ func checkRateLimitError(err error) (retryDelay time.Duration, isRateLimit bool)
 	return 0, false
 }
 
-// extractRetryDelay parses retry delay from error message
 func extractRetryDelay(errStr string) time.Duration {
-	// Match patterns like "retry in 1.5s" or "Please retry in 2.5s"
 	re := regexp.MustCompile(`retry in ([0-9.]+)s`)
 	if matches := re.FindStringSubmatch(errStr); len(matches) > 1 {
 		if seconds, err := strconv.ParseFloat(matches[1], 64); err == nil {
@@ -204,12 +188,11 @@ func HitRateLimit() error {
 		return err
 	}
 
-	// small prompt enough to trigger request but not heavy
 	input := []*genai.Content{
 		{Parts: []*genai.Part{{Text: "hi"}}},
 	}
 
-	for i := 0; i < 50; i++ { // spam 50 times
+	for i := 0; i < 50; i++ {
 		fmt.Println("Request", i+1)
 
 		_, err := client.Models.GenerateContent(
