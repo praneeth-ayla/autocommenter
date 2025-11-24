@@ -45,16 +45,20 @@ Example:
   AutoCommenter readme gen
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		providerName, _ := config.GetProvider()
+		provider, err := ai.NewProvider(providerName)
+		if err != nil {
+			fmt.Println("provider error:", err)
+			return err
+		}
 
 		rootPath := scanner.GetProjectRoot()
-		providerName, _ := config.GetProvider()
-		provider := ai.NewProvider(providerName)
-
 		fmt.Println("Loading project context...")
 		contextData, err := contextstore.Load()
 		if err != nil {
 			return fmt.Errorf("failed to load context: %w", err)
 		}
+
 		allCtxSlice := contextstore.MapToSlice(contextData)
 
 		// check existing README file
@@ -91,6 +95,9 @@ Example:
 }
 
 func init() {
+	genReadmeCmd.SilenceUsage = true
+	genReadmeCmd.SilenceErrors = true
+
 	rootCmd.AddCommand(readmeCmd)
 	readmeCmd.AddCommand(genReadmeCmd)
 }

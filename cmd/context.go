@@ -40,7 +40,12 @@ Example:
   AutoCommenter context gen
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Generating Context")
+		providerName, _ := config.GetProvider()
+		provider, err := ai.NewProvider(providerName)
+		if err != nil {
+			fmt.Println("provider error:", err)
+			return err
+		}
 
 		rootPath := scanner.GetProjectRoot()
 		files, err := scanner.Scan(rootPath)
@@ -49,13 +54,11 @@ Example:
 			return fmt.Errorf("scan failed: %w", err)
 		}
 
+		fmt.Println("Generating Context")
 		if len(files) == 0 {
 			fmt.Println("No files found for context generation")
 			return nil
 		}
-
-		providerName, _ := config.GetProvider()
-		provider := ai.NewProvider(providerName)
 
 		batches := scanner.BatchByLines(files, 500)
 		allContext := make(map[string]contextstore.FileDetails)
@@ -108,6 +111,9 @@ Example:
 }
 
 func init() {
+	contextGenCmd.SilenceUsage = true
+	contextGenCmd.SilenceErrors = true
+
 	rootCmd.AddCommand(contextCmd)
 	contextCmd.AddCommand(contextGenCmd)
 }

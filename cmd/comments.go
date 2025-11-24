@@ -67,10 +67,14 @@ func init() {
 }
 
 func runGenerateComments(cmd *cobra.Command, args []string) error {
-	rootPath := scanner.GetProjectRoot()
 	providerName, _ := config.GetProvider()
-	provider := ai.NewProvider(providerName)
+	provider, err := ai.NewProvider(providerName)
+	if err != nil {
+		fmt.Println("provider error:", err)
+		return err
+	}
 
+	rootPath := scanner.GetProjectRoot()
 	fmt.Println("Scanning project files...")
 	files, err := scanner.Scan(rootPath)
 	if err != nil {
