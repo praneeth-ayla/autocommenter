@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
 )
 
 func Save(all map[string]FileDetails) error {
@@ -24,7 +26,7 @@ func Save(all map[string]FileDetails) error {
 		return err
 	}
 
-	return os.WriteFile(configPath, data, 0644)
+	return scanner.WriteFile(configPath, string(data))
 }
 
 func Load() (map[string]FileDetails, error) {
@@ -56,7 +58,26 @@ func getConfigFilePath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, "AutoCommenter", "contextstore.json"), nil
+
+	projectRoot := scanner.GetProjectRoot()
+	goModPath := filepath.Join(projectRoot, "go.mod")
+
+	data, err := os.ReadFile(goModPath)
+	if err != nil {
+		return "", err
+	}
+
+	var moduleName string
+	_, err = fmt.Sscanf(string(data), "module %s", &moduleName)
+	if err != nil {
+		return "", fmt.Errorf("failed to read module name")
+	}
+
+	projectName := filepath.Base(moduleName)
+
+	fileName := projectName + ".json"
+
+	return filepath.Join(home, "AutoCommenter", fileName), nil
 }
 
 func ensureDir(dir string) error {

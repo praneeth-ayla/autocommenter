@@ -5,6 +5,7 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 	"sync"
 
 	"github.com/praneeth-ayla/AutoCommenter/internal/ai"
@@ -73,9 +74,17 @@ Example:
 
 				mu.Lock()
 				for _, item := range ctx {
+					rel, err := filepath.Rel(rootPath, item.Path)
+					if err != nil || rel == "." {
+						item.Path = filepath.Clean(item.Path)
+					} else {
+						item.Path = filepath.ToSlash(rel)
+					}
+
 					allContext[item.Path] = item
 				}
 				mu.Unlock()
+
 			}(batch)
 		}
 		wg.Wait()
