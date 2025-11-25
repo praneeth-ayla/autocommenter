@@ -56,10 +56,46 @@ func (g *GeminiProvider) GenerateComments(content string, contexts []contextstor
 	const maxCommentBlocks = 40
 	out = providerutil.PruneExcessiveComments(out, maxCommentBlocks)
 
-	if changed, diff := providerutil.NonCommentCodeChanged(content, out); changed {
-		updatedCode, _ := applyAIFixes(content, out)
-		fmt.Printf("commenting aborted: non comment code changed. diff:\n%s", diff)
-		return updatedCode, nil
+	// If non-comment code changed in the AI output, attempt to fix it using applyAIFixes.
+	if changed, _ := providerutil.NonCommentCodeChanged(content, out); changed {
+		// Try to apply AI fixes, validating after each attempt that non-comment code
+		// hasn't been altered. If we cannot produce a safe fix, return an error and
+		// do not change the file.
+		const maxFixAttempts = 2
+		var lastErr error
+		var fixed string
+
+		for attempt := 1; attempt <= maxFixAttempts; attempt++ {
+			fixed, lastErr = applyAIFixes(content, out)
+			if lastErr != nil {
+				// applyAIFixes already returns parse errors; we can retry if < attempts
+				out = fixed // try next round with whatever AI returned (if any)
+				continue
+			}
+
+			// ensure we got non-empty output
+			if strings.TrimSpace(fixed) == "" {
+				lastErr = fmt.Errorf("applyAIFixes returned empty output on attempt %d", attempt)
+				out = fixed
+				continue
+			}
+
+			// make sure fixes did not change non-comment code
+			if changed2, _ := providerutil.NonCommentCodeChanged(content, fixed); !changed2 {
+				// success: fixed comments only (or produced safe output)
+				return fixed, nil
+			}
+
+			// still changes non-comment code; prepare for another attempt
+			out = fixed
+			lastErr = fmt.Errorf("non-comment code still changed after attempt %d", attempt)
+		}
+
+		// if we reach here, attempts exhausted and we couldn't safely fix the code
+		if lastErr == nil {
+			lastErr = fmt.Errorf("ai fixes failed and changed non-comment code")
+		}
+		return "", fmt.Errorf("ai fixes unsafe: %w", lastErr)
 	}
 
 	return out, nil
