@@ -1,10 +1,11 @@
-module github.com/praneeth-ayla/AutoCommenter
+module github.com/praneeth-ayla/autocommenter
 
 go 1.25.3
 
 require (
 	github.com/alpkeskin/gotoon v0.1.0
 	github.com/googleapis/gax-go/v2 v2.13.0
+	github.com/praneeth-ayla/autocommenter v0.0.0-20251125202951-d5347e93896d
 	github.com/spf13/cobra v1.10.1
 	google.golang.org/genai v1.34.0
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240903143218-8af14fe29dc1

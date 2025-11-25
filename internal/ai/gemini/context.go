@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
-	"github.com/praneeth-ayla/AutoCommenter/internal/prompt"
-	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
+	"github.com/praneeth-ayla/autocommenter/internal/contextstore"
+	"github.com/praneeth-ayla/autocommenter/internal/prompt"
+	"github.com/praneeth-ayla/autocommenter/internal/scanner"
 	"google.golang.org/genai"
 )
 

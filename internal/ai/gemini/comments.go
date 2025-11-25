@@ -8,9 +8,9 @@ import (
 	"go/token"
 	"strings"
 
-	"github.com/praneeth-ayla/AutoCommenter/internal/ai/providerutil"
-	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
-	"github.com/praneeth-ayla/AutoCommenter/internal/prompt"
+	"github.com/praneeth-ayla/autocommenter/internal/ai/providerutil"
+	"github.com/praneeth-ayla/autocommenter/internal/contextstore"
+	"github.com/praneeth-ayla/autocommenter/internal/prompt"
 	"google.golang.org/genai"
 )
 

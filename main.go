@@ -3,7 +3,7 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 */
 package main
 
-import "github.com/praneeth-ayla/AutoCommenter/cmd"
+import "github.com/praneeth-ayla/autocommenter/cmd"
 
 // main is the entry point of the AutoCommenter application.
 func main() {

@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/alpkeskin/gotoon"
-	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
+	"github.com/praneeth-ayla/autocommenter/internal/contextstore"
 )
 
 // BuildFileContextPrompt constructs a prompt for analyzing the context of a file.
@@ -18,7 +18,7 @@ func BuildFileContextPrompt(path string, content string) string {
 // BuildCommentPrompt constructs a prompt for generating code comments based on style and context.
 func BuildCommentPrompt(style string, content string, contextData string) (string, error) {
 	data := map[string]interface{}{
-		"content": content, // The code content to comment on.
+		"content": content,     // The code content to comment on.
 		"context": contextData, // Additional context data for the AI.
 	}
 
@@ -65,7 +65,7 @@ func BuildReadmePrompt(contexts []contextstore.FileDetails, existingReadme strin
 		sb.WriteByte('\n') // Adds a newline after each JSON object.
 	}
 
-	contextStr := sb.String()                // Converts the builder content to a string.
+	contextStr := sb.String()                      // Converts the builder content to a string.
 	readmeStr := strings.TrimSpace(existingReadme) // Removes leading/trailing whitespace from existing README.
 	treeStr := strings.TrimSpace(fileTree)         // Removes leading/trailing whitespace from file tree.
 

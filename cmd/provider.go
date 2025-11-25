@@ -6,9 +6,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/praneeth-ayla/AutoCommenter/internal/ai"
-	"github.com/praneeth-ayla/AutoCommenter/internal/config"
-	"github.com/praneeth-ayla/AutoCommenter/internal/ui"
+	"github.com/praneeth-ayla/autocommenter/internal/ai"
+	"github.com/praneeth-ayla/autocommenter/internal/config"
+	"github.com/praneeth-ayla/autocommenter/internal/ui"
 	"github.com/spf13/cobra"
 )
 

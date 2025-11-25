@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
+	"github.com/praneeth-ayla/autocommenter/internal/scanner"
 )
 
 // Save stores the provided FileDetails map to a JSON file.
@@ -63,7 +63,7 @@ func getConfigFilePath() (string, error) {
 		return "", err
 	}
 
-	projectRoot := scanner.GetProjectRoot()       // Get the project's root directory.
+	projectRoot := scanner.GetProjectRoot()           // Get the project's root directory.
 	goModPath := filepath.Join(projectRoot, "go.mod") // Construct the path to the go.mod file.
 
 	data, err := os.ReadFile(goModPath) // Read the content of the go.mod file.

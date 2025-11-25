@@ -3,17 +3,17 @@ package ai
 import (
 	"fmt"
 
-	"github.com/praneeth-ayla/AutoCommenter/internal/ai/gemini"
-	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
-	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
+	"github.com/praneeth-ayla/autocommenter/internal/ai/gemini"
+	"github.com/praneeth-ayla/autocommenter/internal/contextstore"
+	"github.com/praneeth-ayla/autocommenter/internal/scanner"
 )
 
 // Provider defines the interface for AI comment generation services.
 type Provider interface {
-	Validate() error                                                              // Validate checks if the provider is configured correctly.
+	Validate() error                                                                                    // Validate checks if the provider is configured correctly.
 	GenerateComments(content string, contexts []contextstore.FileDetails, style string) (string, error) // GenerateComments creates comments for the given content and contexts.
-	GenerateContextBatch(files []scanner.Data) ([]contextstore.FileDetails, error) // GenerateContextBatch generates context details for multiple files.
-	GenerateReadme(contexts []contextstore.FileDetails, existingReadme string) (string, error)    // GenerateReadme generates a README file based on the provided contexts.
+	GenerateContextBatch(files []scanner.Data) ([]contextstore.FileDetails, error)                      // GenerateContextBatch generates context details for multiple files.
+	GenerateReadme(contexts []contextstore.FileDetails, existingReadme string) (string, error)          // GenerateReadme generates a README file based on the provided contexts.
 }
 
 // SupportedProviders lists the names of AI providers that the application supports.

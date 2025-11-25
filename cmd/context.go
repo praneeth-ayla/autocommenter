@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/praneeth-ayla/AutoCommenter/internal/ai"
-	"github.com/praneeth-ayla/AutoCommenter/internal/ai/providerutil"
-	"github.com/praneeth-ayla/AutoCommenter/internal/config"
-	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
-	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
+	"github.com/praneeth-ayla/autocommenter/internal/ai"
+	"github.com/praneeth-ayla/autocommenter/internal/ai/providerutil"
+	"github.com/praneeth-ayla/autocommenter/internal/config"
+	"github.com/praneeth-ayla/autocommenter/internal/contextstore"
+	"github.com/praneeth-ayla/autocommenter/internal/scanner"
 	"github.com/spf13/cobra"
 )
 
