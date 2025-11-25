@@ -31,6 +31,10 @@ func BuildCommentPrompt(content string, contextData string) (string, error) {
 	return fmt.Sprintf(TemplateCommentsFile, encoded), nil
 }
 
+func BuildFixesPrompt(original string, aiOutput string) string {
+	return fmt.Sprintf(TemplateApplyFixes, original, aiOutput)
+}
+
 func BuildReadmePrompt(contexts []contextstore.FileDetails, existingReadme string) (string, error) {
 	var sb strings.Builder
 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"go/parser"
+	"go/token"
 	"strings"
 
 	"github.com/praneeth-ayla/AutoCommenter/internal/ai/providerutil"
@@ -55,9 +57,46 @@ func (g *GeminiProvider) GenerateComments(content string, contexts []contextstor
 	out = providerutil.PruneExcessiveComments(out, maxCommentBlocks)
 
 	if changed, diff := providerutil.NonCommentCodeChanged(content, out); changed {
+		updatedCode, _ := applyAIFixes(content, out)
 		fmt.Printf("commenting aborted: non comment code changed. diff:\n%s", diff)
-		return "", nil
+		return updatedCode, nil
 	}
 
 	return out, nil
+}
+
+func applyAIFixes(original string, aiOutput string) (string, error) {
+	ctx := context.Background()
+
+	client, err := genai.NewClient(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+
+	promptText := prompt.BuildFixesPrompt(original, aiOutput)
+
+	config := &genai.GenerateContentConfig{
+		SystemInstruction: &genai.Content{
+			Parts: []*genai.Part{{Text: prompt.SystemInstructionFixes}},
+		},
+		ResponseMIMEType: "text/plain",
+	}
+
+	input := []*genai.Content{{Parts: []*genai.Part{{Text: promptText}}}}
+
+	result, err := client.Models.GenerateContent(ctx, "gemini-2.5-pro", input, config)
+	if err != nil {
+		return "", err
+	}
+
+	fixed := result.Text()
+	fixed = providerutil.StripCodeFences(fixed)
+	fixed = providerutil.EnsurePackageLine(fixed, original)
+
+	fset := token.NewFileSet()
+	if _, err := parser.ParseFile(fset, "", fixed, parser.AllErrors); err != nil {
+		return "", fmt.Errorf("ai returned invalid Go source: %w", err)
+	}
+
+	return fixed, nil
 }

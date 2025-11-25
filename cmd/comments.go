@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strconv"
 	"strings"
@@ -17,14 +18,14 @@ import (
 	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
 	"github.com/praneeth-ayla/AutoCommenter/internal/ui"
 	"github.com/spf13/cobra"
-	"google.golang.org/genai"
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc/codes"
 )
 
 const (
-	defaultRetryDelay = 60 * time.Second
+	defaultRetryDelay = 5 * time.Second
 	maxRetryAttempts  = 3
+	perRequestTimeout = 60 * time.Second
 )
 
 var commentsCmd = &cobra.Command{
@@ -38,26 +39,13 @@ Example:
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Use 'comments gen' to generate comments for your files")
-		err := HitRateLimit()
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println("OK")
-		}
 	},
 }
 
 var genCommentsCmd = &cobra.Command{
 	Use:   "gen",
 	Short: "Add comments to code files that need them",
-	Long: `Scan the project and find files without proper comments.
-Use AI to generate comments and write them back into the files.
-Retries automatically if API rate limits occur.
-
-Example:
-  AutoCommenter comments gen
-`,
-	RunE: runGenerateComments,
+	RunE:  runGenerateComments,
 }
 
 func init() {
@@ -72,22 +60,20 @@ func runGenerateComments(cmd *cobra.Command, args []string) error {
 	providerName, _ := config.GetProvider()
 	provider, err := ai.NewProvider(providerName)
 	if err != nil {
-		fmt.Println("provider error:", err)
-		return err
+		return fmt.Errorf("provider init: %w", err)
 	}
 
 	commentStyle, err := ui.SelectOne("Select comment style:", prompt.Styles)
 	if err != nil {
 		return err
 	}
-
-	fmt.Println(commentStyle)
+	_ = commentStyle
 
 	rootPath := scanner.GetProjectRoot()
 	fmt.Println("Scanning project files...")
 	files, err := scanner.Scan(rootPath)
 	if err != nil {
-		return fmt.Errorf("failed to scan files: %w", err)
+		return fmt.Errorf("scan failed: %w", err)
 	}
 
 	filteredFiles := scanner.FilterFilesNeedingComments(files)
@@ -99,34 +85,32 @@ func runGenerateComments(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Found %d files needing comments\n", len(filteredFiles))
 
 	fmt.Println("Loading project context...")
-	context, err := contextstore.Load()
+	ctxMap, err := contextstore.Load()
 	if err != nil {
-		return fmt.Errorf("failed to load context: %w", err)
+		return fmt.Errorf("load context: %w", err)
 	}
-	allCtxSlice := contextstore.MapToSlice(context)
+	allCtxSlice := contextstore.MapToSlice(ctxMap)
 
-	fmt.Println("Generating comments...")
+	fmt.Println("Generating comments (this may take a while)...")
 	successCount, errorCount := 0, 0
 
 	for i, file := range filteredFiles {
-		fmt.Printf("\n[%d/%d] Processing: %s\n", i+1, len(filteredFiles), file.Path)
-
+		fmt.Printf("\n[%d/%d] %s\n", i+1, len(filteredFiles), file.Path)
 		if err := processFile(file, provider, allCtxSlice); err != nil {
-			fmt.Printf("Error: %v\n", err)
+			fmt.Printf("  ✖ error: %v\n", err)
 			errorCount++
 		} else {
-			fmt.Println("Updated successfully")
+			fmt.Println("  ✓ updated")
 			successCount++
 		}
 	}
 
-	fmt.Println("\n" + strings.Repeat("─", 50) + "\n")
+	fmt.Println("\n" + strings.Repeat("─", 50))
 	fmt.Printf("Summary: %d succeeded, %d failed\n", successCount, errorCount)
 
 	if errorCount > 0 {
 		return fmt.Errorf("completed with %d errors", errorCount)
 	}
-
 	return nil
 }
 
@@ -135,30 +119,57 @@ func processFile(file scanner.Info, provider ai.Provider, context []contextstore
 	var lastErr error
 
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
-		commented, err := provider.GenerateComments(fd.Content, context)
-		if err == nil {
-			return scanner.WriteFile(file.Path, commented)
+		attemptTimeout := time.Duration(perRequestTimeout)
+		ctx, cancel := contextWithTimeout(attemptTimeout)
+		defer cancel()
+
+		done := make(chan struct{})
+		var commented string
+		var err error
+
+		go func() {
+			commented, err = provider.GenerateComments(fd.Content, context)
+			close(done)
+		}()
+
+		select {
+		case <-ctx.Done():
+			lastErr = fmt.Errorf("request timed out after %s", attemptTimeout)
+		case <-done:
+			if err == nil {
+				return scanner.WriteFile(file.Path, commented)
+			}
+			lastErr = err
 		}
 
-		lastErr = err
-
-		if retryDelay, isRateLimit := checkRateLimitError(err); isRateLimit {
+		if delay, isRateLimit := checkRateLimitError(lastErr); isRateLimit {
 			if attempt < maxRetryAttempts {
-				fmt.Printf("Rate limit hit. Waiting %v before retry %d/%d...\n",
-					retryDelay, attempt+1, maxRetryAttempts)
-				time.Sleep(retryDelay)
+				sleepWithJitter(delay)
 				continue
 			}
-			return fmt.Errorf("rate limit exceeded after %d attempts", maxRetryAttempts)
+			return fmt.Errorf("rate limit after %d attempts: %w", maxRetryAttempts, lastErr)
 		}
 
-		return fmt.Errorf("generation failed: %w", err)
+		// Non-rate-limit error -> fail fast
+		return fmt.Errorf("generation failed: %w", lastErr)
 	}
 
-	return fmt.Errorf("max retries exceeded: %w", lastErr)
+	return fmt.Errorf("retries exhausted: %w", lastErr)
+}
+
+func contextWithTimeout(d time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.Background(), d)
+}
+
+func sleepWithJitter(base time.Duration) {
+	j := time.Duration(rand.Int63n(int64(base / 2))) // jitter up to half of base
+	time.Sleep(base + j)
 }
 
 func checkRateLimitError(err error) (time.Duration, bool) {
+	if err == nil {
+		return 0, false
+	}
 	errStr := err.Error()
 	if strings.Contains(errStr, "RESOURCE_EXHAUSTED") ||
 		strings.Contains(errStr, "429") ||
@@ -193,37 +204,4 @@ func extractRetryDelay(errStr string) time.Duration {
 		}
 	}
 	return defaultRetryDelay
-}
-
-func HitRateLimit() error {
-	ctx := context.Background()
-
-	client, err := genai.NewClient(ctx, nil)
-	if err != nil {
-		return err
-	}
-
-	input := []*genai.Content{
-		{Parts: []*genai.Part{{Text: "hi"}}},
-	}
-
-	for i := 0; i < 50; i++ {
-		fmt.Println("Request", i+1)
-
-		_, err := client.Models.GenerateContent(
-			ctx,
-			"gemini-2.5-flash-lite",
-			input,
-			nil,
-		)
-
-		if err != nil {
-			fmt.Println("Error on request", i+1, err)
-			return err
-		}
-
-		fmt.Println("OK")
-	}
-
-	return nil
 }
