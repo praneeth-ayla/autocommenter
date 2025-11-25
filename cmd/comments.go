@@ -1,31 +1,17 @@
 package cmd
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"math/rand"
-	"regexp"
-	"strconv"
 	"strings"
-	"time"
 
-	"github.com/googleapis/gax-go/v2/apierror"
 	"github.com/praneeth-ayla/AutoCommenter/internal/ai"
+	"github.com/praneeth-ayla/AutoCommenter/internal/ai/providerutil"
 	"github.com/praneeth-ayla/AutoCommenter/internal/config"
 	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
 	"github.com/praneeth-ayla/AutoCommenter/internal/prompt"
 	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
 	"github.com/praneeth-ayla/AutoCommenter/internal/ui"
 	"github.com/spf13/cobra"
-	"google.golang.org/genproto/googleapis/rpc/errdetails"
-	"google.golang.org/grpc/codes"
-)
-
-const (
-	defaultRetryDelay = 5 * time.Second
-	maxRetryAttempts  = 3
-	perRequestTimeout = 60 * time.Second
 )
 
 var commentsCmd = &cobra.Command{
@@ -114,94 +100,19 @@ func runGenerateComments(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func processFile(file scanner.Info, provider ai.Provider, context []contextstore.FileDetails) error {
+func processFile(file scanner.Info, provider ai.Provider, ctx []contextstore.FileDetails) error {
 	fd := scanner.LoadSingle(file)
-	var lastErr error
 
-	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
-		attemptTimeout := time.Duration(perRequestTimeout)
-		ctx, cancel := contextWithTimeout(attemptTimeout)
-		defer cancel()
-
-		done := make(chan struct{})
-		var commented string
-		var err error
-
-		go func() {
-			commented, err = provider.GenerateComments(fd.Content, context)
-			close(done)
-		}()
-
-		select {
-		case <-ctx.Done():
-			lastErr = fmt.Errorf("request timed out after %s", attemptTimeout)
-		case <-done:
-			if err == nil {
-				return scanner.WriteFile(file.Path, commented)
-			}
-			lastErr = err
-		}
-
-		if delay, isRateLimit := checkRateLimitError(lastErr); isRateLimit {
-			if attempt < maxRetryAttempts {
-				sleepWithJitter(delay)
-				continue
-			}
-			return fmt.Errorf("rate limit after %d attempts: %w", maxRetryAttempts, lastErr)
-		}
-
-		// Non-rate-limit error -> fail fast
-		return fmt.Errorf("generation failed: %w", lastErr)
+	commented, err := providerutil.DoWithRetry[string](
+		providerutil.MaxRetryAttempts,
+		providerutil.PerRequestTimeout,
+		func() (string, error) {
+			return provider.GenerateComments(fd.Content, ctx)
+		},
+	)
+	if err != nil {
+		return err
 	}
 
-	return fmt.Errorf("retries exhausted: %w", lastErr)
-}
-
-func contextWithTimeout(d time.Duration) (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), d)
-}
-
-func sleepWithJitter(base time.Duration) {
-	j := time.Duration(rand.Int63n(int64(base / 2))) // jitter up to half of base
-	time.Sleep(base + j)
-}
-
-func checkRateLimitError(err error) (time.Duration, bool) {
-	if err == nil {
-		return 0, false
-	}
-	errStr := err.Error()
-	if strings.Contains(errStr, "RESOURCE_EXHAUSTED") ||
-		strings.Contains(errStr, "429") ||
-		strings.Contains(errStr, "Quota exceeded") {
-		return extractRetryDelay(errStr), true
-	}
-
-	var apiErr *apierror.APIError
-	if errors.As(err, &apiErr) {
-		if status := apiErr.GRPCStatus(); status != nil && status.Code() == codes.ResourceExhausted {
-			for _, detail := range status.Details() {
-				if retryInfo, ok := detail.(*errdetails.RetryInfo); ok {
-					if retryInfo.RetryDelay != nil {
-						if d := retryInfo.RetryDelay.AsDuration(); d > 0 {
-							return d, true
-						}
-					}
-				}
-			}
-			return defaultRetryDelay, true
-		}
-	}
-
-	return 0, false
-}
-
-func extractRetryDelay(errStr string) time.Duration {
-	re := regexp.MustCompile(`retry in ([0-9.]+)s`)
-	if matches := re.FindStringSubmatch(errStr); len(matches) > 1 {
-		if seconds, err := strconv.ParseFloat(matches[1], 64); err == nil {
-			return time.Duration(seconds * float64(time.Second))
-		}
-	}
-	return defaultRetryDelay
+	return scanner.WriteFile(file.Path, commented)
 }

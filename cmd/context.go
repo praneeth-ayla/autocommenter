@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/praneeth-ayla/AutoCommenter/internal/ai"
+	"github.com/praneeth-ayla/AutoCommenter/internal/ai/providerutil"
 	"github.com/praneeth-ayla/AutoCommenter/internal/config"
 	"github.com/praneeth-ayla/AutoCommenter/internal/contextstore"
 	"github.com/praneeth-ayla/AutoCommenter/internal/scanner"
@@ -72,14 +73,21 @@ Example:
 				defer wg.Done()
 
 				batchData := scanner.Load(b)
-				ctx, err := provider.GenerateContextBatch(batchData)
+
+				ctxBatch, err := providerutil.DoWithRetry[[]contextstore.FileDetails](
+					providerutil.MaxRetryAttempts,
+					providerutil.PerRequestTimeout,
+					func() ([]contextstore.FileDetails, error) {
+						return provider.GenerateContextBatch(batchData)
+					},
+				)
 				if err != nil {
 					fmt.Println("context batch error:", err)
 					return
 				}
 
 				mu.Lock()
-				for _, item := range ctx {
+				for _, item := range ctxBatch {
 					rel, err := filepath.Rel(rootPath, item.Path)
 					if err != nil || rel == "." {
 						item.Path = filepath.Clean(item.Path)
