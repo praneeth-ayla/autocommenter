@@ -1,4 +1,4 @@
-# autocommenter
+# AutoCommenter
 
 autocommenter is a command-line tool for Go projects that leverages AI to automate documentation tasks. It scans your codebase to build a contextual understanding of each file's purpose, exports, and imports. This context is then used by an AI provider to generate code comments and comprehensive `README.md` files.
 
@@ -33,7 +33,7 @@ The project is organized into a command-line interface and several internal pack
 Install autocommenter using `go install`:
 
 ```bash
-go install github.com/praneeth-ayla/autocommenter
+go install github.com/praneeth-ayla/autocommenter@latest
 ```
 
 Ensure that your Go environment is set up correctly and that `$GOPATH/bin` is in your system's `PATH`.
